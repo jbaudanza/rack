@@ -210,4 +210,27 @@ describe Rack::File do
     res['Content-Type'].should.equal nil
   end
 
+  should "serve an uncompressed file" do
+    res = Rack::MockRequest.new(file(DOCROOT)).get("/cgi/assets/compress_me.html")
+    res.body.should == 'Hello, Rack!'
+    res.headers['Vary'].should =='Accept-Encoding'
+    res.headers.should.not.include('Content-Encoding')
+    res.headers['Content-Length'].should ==
+        File.size(DOCROOT + '/cgi/assets/compress_me.html').to_s
+  end
+
+  should "serve a compressed file" do
+    res = Rack::MockRequest.new(file(DOCROOT)).get(
+        "/cgi/assets/compress_me.html",
+        'HTTP_ACCEPT_ENCODING' => 'gzip')
+    gz = Zlib::GzipReader.new(StringIO.new(res.body))
+    gz.read.should == "Hello, Rack!"
+    res.headers['Vary'].should =='Accept-Encoding'
+    res.headers['Content-Encoding'].should == 'gzip'
+    res.headers['Content-Type'].should == 'text/html'
+    res.headers['Content-Length'].should ==
+        File.size(DOCROOT + '/cgi/assets/compress_me.html.gz').to_s
+  end
+
+
 end

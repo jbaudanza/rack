@@ -55,25 +55,41 @@ module Rack
 
       @path = F.join(@root, *parts)
 
-      available = begin
-        F.file?(@path) && F.readable?(@path)
-      rescue SystemCallError
-        false
-      end
-
-      if available
+      if available?(@path)
         serving(env)
       else
         fail(404, "File not found: #{path_info}")
       end
     end
 
+    def available?(path)
+      begin
+        F.file?(path) && F.readable?(path)
+      rescue SystemCallError
+        false
+      end
+    end
+
     def serving(env)
+      headers = {}
+
+      # Check to see if a gzipped version of the file is available and
+      # should be sent.
+      gz_path = "#{@path}.gz"
+      mime_path = @path
+      if available?(gz_path)
+        headers['Vary'] = 'Accept-Encoding'
+        if env['HTTP_ACCEPT_ENCODING'] =~ /\bgzip\b/
+          @path = gz_path
+          headers['Content-Encoding'] = 'gzip'
+        end
+      end
+
       last_modified = F.mtime(@path).httpdate
       return [304, {}, []] if env['HTTP_IF_MODIFIED_SINCE'] == last_modified
 
-      headers = { "Last-Modified" => last_modified }
-      mime = Mime.mime_type(F.extname(@path), @default_mime)
+      headers["Last-Modified"] = last_modified
+      mime = Mime.mime_type(F.extname(mime_path), @default_mime)
       headers["Content-Type"] = mime if mime
 
       # Set custom headers
