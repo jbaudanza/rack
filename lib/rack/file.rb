@@ -17,13 +17,12 @@ module Rack
 
     attr_accessor :root
     attr_accessor :path
-    attr_accessor :cache_control
 
     alias :to_path :path
 
     def initialize(root, headers={}, default_mime = 'text/plain')
       @root = root
-      @headers = headers
+      @headers = headers || {}
       @default_mime = default_mime
     end
 
@@ -71,7 +70,7 @@ module Rack
     end
 
     def serving(env)
-      headers = {}
+      headers = @headers.dup
 
       # Check to see if a gzipped version of the file is available and
       # should be sent.
@@ -91,9 +90,6 @@ module Rack
       headers["Last-Modified"] = last_modified
       mime = Mime.mime_type(F.extname(mime_path), @default_mime)
       headers["Content-Type"] = mime if mime
-
-      # Set custom headers
-      @headers.each { |field, content| headers[field] = content } if @headers
 
       response = [ 200, headers, env["REQUEST_METHOD"] == "HEAD" ? [] : self ]
 
