@@ -148,8 +148,13 @@ describe Rack::File do
 
   should "support custom http headers" do
     env = Rack::MockRequest.env_for("/cgi/test")
-    status, heads, _ = file(DOCROOT, 'Cache-Control' => 'public, max-age=38',
-     'Access-Control-Allow-Origin' => '*').call(env)
+
+    custom_headers = {
+      'Cache-Control' => 'public, max-age=38',
+      'Access-Control-Allow-Origin' => '*'
+    }
+
+    status, heads, _ = file(DOCROOT, :headers => custom_headers).call(env)
 
     status.should.equal 200
     heads['Cache-Control'].should.equal 'public, max-age=38'
@@ -198,21 +203,24 @@ describe Rack::File do
   end
 
   should "allow the default mime type to be set" do
-    req = Rack::MockRequest.new(Rack::Lint.new(Rack::File.new(DOCROOT, nil, 'application/octet-stream')))
+    req = Rack::MockRequest.new(Rack::Lint.new(Rack::File.new(DOCROOT, :default_mime =>'application/octet-stream')))
     res = req.get "/cgi/test"
     res.should.be.successful
     res['Content-Type'].should.equal "application/octet-stream"
   end
 
-  should "not set Content-Type if the mime type is not set" do
-    req = Rack::MockRequest.new(Rack::Lint.new(Rack::File.new(DOCROOT, nil, nil)))
-    res = req.get "/cgi/test"
-    res.should.be.successful
-    res['Content-Type'].should.equal nil
+  should "not serve compressed file if the caller has opted out" do
+    res = Rack::MockRequest.new(file(DOCROOT, :serve_gzip => false)).get(
+        "/cgi/assets/compress_me.html",
+        'HTTP_ACCEPT_ENCODING' => 'gzip')
+    res.body.should == 'Hello, Rack!'
+    res.headers.should.not.include('Accept-Encoding')
+    res.headers.should.not.include('Content-Encoding')
   end
 
   should "serve an uncompressed file" do
-    res = Rack::MockRequest.new(file(DOCROOT)).get("/cgi/assets/compress_me.html")
+    res = Rack::MockRequest.new(file(DOCROOT, :serve_gzip => true)).get(
+        "/cgi/assets/compress_me.html")
     res.body.should == 'Hello, Rack!'
     res.headers['Vary'].should =='Accept-Encoding'
     res.headers.should.not.include('Content-Encoding')
@@ -221,7 +229,7 @@ describe Rack::File do
   end
 
   should "serve a compressed file" do
-    res = Rack::MockRequest.new(file(DOCROOT)).get(
+    res = Rack::MockRequest.new(file(DOCROOT, :serve_gzip => true)).get(
         "/cgi/assets/compress_me.html",
         'HTTP_ACCEPT_ENCODING' => 'gzip')
     gz = Zlib::GzipReader.new(StringIO.new(res.body))

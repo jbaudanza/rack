@@ -20,10 +20,11 @@ module Rack
 
     alias :to_path :path
 
-    def initialize(root, headers={}, default_mime = 'text/plain')
+    def initialize(root, options={})
       @root = root
-      @headers = headers || {}
-      @default_mime = default_mime
+      @headers      = options[:headers] || {}
+      @serve_gzip   = options[:serve_gzip] || false
+      @default_mime = options[:default_mime] || 'text/plain'
     end
 
     def call(env)
@@ -74,13 +75,15 @@ module Rack
 
       # Check to see if a gzipped version of the file is available and
       # should be sent.
-      gz_path = "#{@path}.gz"
       mime_path = @path
-      if available?(gz_path)
-        headers['Vary'] = 'Accept-Encoding'
-        if env['HTTP_ACCEPT_ENCODING'] =~ /\bgzip\b/
-          @path = gz_path
-          headers['Content-Encoding'] = 'gzip'
+      gz_path = "#{@path}.gz"
+      if @serve_gzip
+        if available?(gz_path)
+          headers['Vary'] = 'Accept-Encoding'
+          if env['HTTP_ACCEPT_ENCODING'] =~ /\bgzip\b/
+            @path = gz_path
+            headers['Content-Encoding'] = 'gzip'
+          end
         end
       end
 
@@ -88,8 +91,10 @@ module Rack
       return [304, {}, []] if env['HTTP_IF_MODIFIED_SINCE'] == last_modified
 
       headers["Last-Modified"] = last_modified
-      mime = Mime.mime_type(F.extname(mime_path), @default_mime)
-      headers["Content-Type"] = mime if mime
+      if @default_mime
+        mime = Mime.mime_type(F.extname(mime_path), @default_mime)
+        headers["Content-Type"] = mime if mime
+      end
 
       response = [ 200, headers, env["REQUEST_METHOD"] == "HEAD" ? [] : self ]
 

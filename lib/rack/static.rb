@@ -92,7 +92,9 @@ module Rack
       @header_rules.insert(0, [:all, {'Cache-Control' => options[:cache_control]}]) if options[:cache_control]
       @headers = {}
 
-      @file_server = Rack::File.new(root, @headers)
+      @file_server = Rack::File.new(root,
+          :headers => @headers,
+          :serve_gzip => options[:serve_gzip])
     end
 
     def overwrite_file_path(path)
