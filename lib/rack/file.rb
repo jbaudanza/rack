@@ -91,10 +91,8 @@ module Rack
       return [304, {}, []] if env['HTTP_IF_MODIFIED_SINCE'] == last_modified
 
       headers["Last-Modified"] = last_modified
-      if @default_mime
-        mime = Mime.mime_type(F.extname(mime_path), @default_mime)
-        headers["Content-Type"] = mime if mime
-      end
+      mime = Mime.mime_type(F.extname(mime_path), @default_mime)
+      headers["Content-Type"] = mime if mime
 
       response = [ 200, headers, env["REQUEST_METHOD"] == "HEAD" ? [] : self ]
 
